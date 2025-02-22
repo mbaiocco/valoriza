@@ -1,0 +1,63 @@
+const express = require('express');
+const cors = require('cors');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const app = express();
+const PORT = 3001;
+
+app.use(cors());
+app.use(express.json());
+
+// Setup SQLite database
+const db = new sqlite3.Database(path.join(__dirname, 'services.db'), (err) => {
+    if (err) {
+        console.error('Erro ao conectar ao banco de dados:', err.message);
+    } else {
+        console.log('Conectado ao banco de dados SQLite.');
+        db.run(`
+            CREATE TABLE IF NOT EXISTS servicos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                preco REAL NOT NULL,
+                cidade TEXT NOT NULL
+            )
+        `);
+    }
+});
+
+// GET all services
+app.get('/api/servicos', (req, res) => {
+    db.all('SELECT * FROM servicos', [], (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        res.json(rows);
+    });
+});
+
+// POST a new service price
+app.post('/api/servicos', (req, res) => {
+    const { nome, preco, cidade } = req.body;
+    if (!nome || !preco || !cidade) {
+        return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+    }
+
+    db.run(
+        'INSERT INTO servicos (nome, preco, cidade) VALUES (?, ?, ?)',
+        [nome, preco, cidade],
+        function (err) {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            res.json({ id: this.lastID, nome, preco, cidade });
+        }
+    );
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`Servidor rodando em http://localhost:${PORT}`);
+});
